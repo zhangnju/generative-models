@@ -118,6 +118,13 @@ now `DiffusionEngine`) has been cleaned up:
 ## Installation:
 
 <a name="installation"></a>
+#### 0. on AMD
+pip3 uninstall torch torchvision torchaudio pytorch-triton-rocm -y
+pip3 install --pre torch torchvision torchaudio --index-url https://download.pytorch.org/whl/nightly/rocm6.1
+
+apt-get update
+apt-get install ffmpeg
+pip install av imageio_ffmpeg
 
 #### 1. Clone the repo
 
