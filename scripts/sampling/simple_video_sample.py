@@ -4,6 +4,8 @@ import sys
 from glob import glob
 from pathlib import Path
 from typing import List, Optional
+import numpy
+import time
 
 sys.path.append(os.path.realpath(os.path.join(os.path.dirname(__file__), "../../")))
 import cv2
@@ -53,6 +55,11 @@ def sample(
         num_steps = default(num_steps, 30)
         output_folder = default(output_folder, "outputs/simple_video_sample/svd_xt/")
         model_config = "scripts/sampling/configs/svd_xt.yaml"
+    elif version == "svd_xt_1_1":
+        num_frames = default(num_frames, 25)
+        num_steps = default(num_steps, 30)
+        output_folder = default(output_folder, "outputs/simple_video_sample/svd_xt_1_1/")
+        model_config = "scripts/sampling/configs/svd_xt_1_1.yaml"
     elif version == "svd_image_decoder":
         num_frames = default(num_frames, 14)
         num_steps = default(num_steps, 25)
@@ -163,9 +170,13 @@ def sample(
         else:
             with Image.open(input_img_path) as image:
                 if image.mode == "RGBA":
+                    print("RGB conversion")
                     input_image = image.convert("RGB")
+                else:
+                    input_image = numpy.array(image)
                 w, h = image.size
-
+                print(w)
+                print(h)
                 if h % 64 != 0 or w % 64 != 0:
                     width, height = map(lambda x: x - x % 64, (w, h))
                     input_image = input_image.resize((width, height))
@@ -213,6 +224,7 @@ def sample(
 
         with torch.no_grad():
             with torch.autocast(device):
+                T1 = time.time()
                 batch, batch_uc = get_batch(
                     get_unique_embedder_keys_from_conditioner(model.conditioner),
                     value_dict,
@@ -254,7 +266,8 @@ def sample(
                 if "sv3d" in version:
                     samples_x[-1:] = value_dict["cond_frames_without_noise"]
                 samples = torch.clamp((samples_x + 1.0) / 2.0, min=0.0, max=1.0)
-
+                T2 = time.time()
+                print('video generation takes:%s sec' % ((T2 - T1)*1))
                 os.makedirs(output_folder, exist_ok=True)
                 base_count = len(glob(os.path.join(output_folder, "*.mp4")))
 
@@ -271,7 +284,7 @@ def sample(
                     .astype(np.uint8)
                 )
                 video_path = os.path.join(output_folder, f"{base_count:06d}.mp4")
-                imageio.mimwrite(video_path, vid)
+                imageio.mimsave(video_path, vid)
 
 
 def get_unique_embedder_keys_from_conditioner(conditioner):
