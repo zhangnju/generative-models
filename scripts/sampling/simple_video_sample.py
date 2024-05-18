@@ -188,6 +188,7 @@ def sample(
         image = image * 2.0 - 1.0
 
         image = image.unsqueeze(0).to(device)
+        image = image.half()
         H, W = image.shape[2:]
         assert image.shape[1] == 3
         F = 8
@@ -244,15 +245,17 @@ def sample(
                 for k in ["crossattn", "concat"]:
                     uc[k] = repeat(uc[k], "b ... -> b t ...", t=num_frames)
                     uc[k] = rearrange(uc[k], "b t ... -> (b t) ...", t=num_frames)
+                    uc[k] = uc[k].half()
                     c[k] = repeat(c[k], "b ... -> b t ...", t=num_frames)
                     c[k] = rearrange(c[k], "b t ... -> (b t) ...", t=num_frames)
+                    c[k] = c[k].half()
 
-                randn = torch.randn(shape, device=device)
+                randn = torch.randn(shape, device=device).half()
 
                 additional_model_inputs = {}
                 additional_model_inputs["image_only_indicator"] = torch.zeros(
                     2, num_frames
-                ).to(device)
+                ).to(device).half()
                 additional_model_inputs["num_video_frames"] = batch["num_video_frames"]
 
                 def denoiser(input, sigma, c):
@@ -261,6 +264,7 @@ def sample(
                     )
 
                 samples_z = model.sampler(denoiser, randn, cond=c, uc=uc)
+                samples_z = samples_z.to(device).half()
                 model.en_and_decode_n_samples_a_time = decoding_t
                 samples_x = model.decode_first_stage(samples_z)
                 if "sv3d" in version:
@@ -320,6 +324,7 @@ def get_batch(keys, value_dict, N, T, device):
             batch[key] = torch.tensor(value_dict[key]).to(device).repeat(N[0])
         else:
             batch[key] = value_dict[key]
+        batch[key] = batch[key].half()
 
     if T is not None:
         batch["num_video_frames"] = T
@@ -327,6 +332,7 @@ def get_batch(keys, value_dict, N, T, device):
     for key in batch.keys():
         if key not in batch_uc and isinstance(batch[key], torch.Tensor):
             batch_uc[key] = torch.clone(batch[key])
+            batch_uc[key] = batch_uc[key].half()
     return batch, batch_uc
 
 
@@ -353,7 +359,7 @@ def load_model(
             model = instantiate_from_config(config.model).to(device).eval()
     else:
         model = instantiate_from_config(config.model).to(device).eval()
-
+    model = model.half()
     filter = DeepFloydDataFiltering(verbose=False, device=device)
     return model, filter
 
