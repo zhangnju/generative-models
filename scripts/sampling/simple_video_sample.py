@@ -32,7 +32,7 @@ def sample(
     motion_bucket_id: int = 127,
     cond_aug: float = 0.02,
     seed: int = 23,
-    decoding_t: int = 14,  # Number of frames decoded at a time! This eats most VRAM. Reduce if necessary.
+    decoding_t: int = 1,  # Number of frames decoded at a time! This eats most VRAM. Reduce if necessary.
     device: str = "cuda",
     output_folder: Optional[str] = None,
     elevations_deg: Optional[float | List[float]] = 10.0,  # For SV3D
@@ -257,7 +257,7 @@ def sample(
                     2, num_frames
                 ).to(device).half()
                 additional_model_inputs["num_video_frames"] = batch["num_video_frames"]
-
+                
                 def denoiser(input, sigma, c):
                     return model.denoiser(
                         model.model, input, sigma, c, **additional_model_inputs
@@ -265,13 +265,14 @@ def sample(
 
                 samples_z = model.sampler(denoiser, randn, cond=c, uc=uc)
                 samples_z = samples_z.to(device).half()
-                model.en_and_decode_n_samples_a_time = decoding_t
+                model.en_and_decode_n_samples_a_time = decoding_t               
                 samples_x = model.decode_first_stage(samples_z)
                 if "sv3d" in version:
                     samples_x[-1:] = value_dict["cond_frames_without_noise"]
                 samples = torch.clamp((samples_x + 1.0) / 2.0, min=0.0, max=1.0)
                 T2 = time.time()
                 print('video generation takes:%s sec' % ((T2 - T1)*1))
+                samples = samples.float()
                 os.makedirs(output_folder, exist_ok=True)
                 base_count = len(glob(os.path.join(output_folder, "*.mp4")))
 
